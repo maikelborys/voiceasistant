@@ -1,0 +1,27 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.python-version
+*.egg-info/
+
+# Model assets (large, re-downloadable)
+models/
+*.onnx
+*.bin
+*.gguf
+
+# Env / secrets
+.env
+.env.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Claude Code local settings (personal; don't push)
+.claude/settings.local.json

@@ -1,0 +1,16 @@
+[project]
+name = "pipecatassistant"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.3",
+    "loguru>=0.7.3",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "nvidia-cuda-runtime-cu12>=12.9.79",
+    "nvidia-cudnn-cu12>=9.21.0.82",
+    "pipecat-ai[local,ollama,piper,silero,whisper]>=1.0.0",
+    "python-dotenv>=1.2.2",
+    "websockets>=16.0",
+]
