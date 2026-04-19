@@ -88,6 +88,18 @@ wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/me
 cd ../..
 ```
 
+### 6b. Other languages
+
+The default persona is English. To run in Spanish, use the included `es` persona:
+
+```bash
+uv run python bot.py --persona es
+```
+
+It selects `whisper_model: SMALL` (multilingual — `DISTIL_MEDIUM_EN` is English-only) with `language: es`, plus the Piper voice `es_ES-davefx-medium`. On first launch the Whisper SMALL checkpoint and the Spanish voice auto-download into `models/` — expect ~15 s of one-time setup before the first reply.
+
+To add another language: copy `wiki_templates/personas/es.md` to `<lang>.md`, change `language:`, `voice:`, `whisper_model:` (keep a multilingual model — `SMALL`, `MEDIUM`, `LARGE_V3_TURBO`), and rewrite the prompt. `llama3.1:8b` is natively multilingual, so no LLM change is needed.
+
 ## 7. Run
 
 Only two moving parts — Pipecat 1.0's `PiperTTSService` loads the voice **in-process** via `PiperVoice.load()`, so no separate Piper HTTP server is needed.

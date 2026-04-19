@@ -28,6 +28,7 @@ from pipecat.services.ollama.llm import OLLamaLLMService
 from pipecat.services.piper.tts import PiperTTSService
 from pipecat.services.whisper.stt import Model as WhisperModel
 from pipecat.services.whisper.stt import WhisperSTTService
+from pipecat.transcriptions.language import Language
 from pipecat.turns.user_mute import AlwaysUserMuteStrategy
 
 from voiceassistant import config
@@ -45,11 +46,15 @@ def build_pipeline(
     stages = [bundle.input, SpeechEventLogger()]
 
     if bundle.needs_stt:
+        whisper_model_name = persona.whisper_model or config.WHISPER_MODEL
+        stt_settings_kwargs: dict = {
+            "model": getattr(WhisperModel, whisper_model_name).value,
+        }
+        if persona.language:
+            stt_settings_kwargs["language"] = Language(persona.language)
         stages.append(
             WhisperSTTService(
-                settings=WhisperSTTService.Settings(
-                    model=getattr(WhisperModel, config.WHISPER_MODEL).value
-                ),
+                settings=WhisperSTTService.Settings(**stt_settings_kwargs),
                 device=config.WHISPER_DEVICE,
                 compute_type=config.WHISPER_COMPUTE_TYPE,
             )

@@ -19,6 +19,8 @@ class Persona:
     system_prompt: str
     piper_voice: str
     tool_allowlist: tuple[str, ...] = ()
+    language: str | None = None
+    whisper_model: str | None = None
 
 
 def _parse_persona_markdown(persona_id: str, text: str) -> Persona:
@@ -42,6 +44,8 @@ def _parse_persona_markdown(persona_id: str, text: str) -> Persona:
         system_prompt=body,
         piper_voice=meta.get("voice", config.PIPER_VOICE_DEFAULT),
         tool_allowlist=allow,
+        language=meta.get("language") or None,
+        whisper_model=meta.get("whisper_model") or None,
     )
 
 
