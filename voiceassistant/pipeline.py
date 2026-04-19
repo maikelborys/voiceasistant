@@ -36,6 +36,7 @@ from voiceassistant import config
 from voiceassistant.personas import Persona
 from voiceassistant.processors.speech_logger import SpeechEventLogger
 from voiceassistant.processors.vector_retrieval import VectorRetrieval
+from voiceassistant.processors.voice_effect import PitchShift
 from voiceassistant.processors.wiki_librarian import WikiLibrarian
 from voiceassistant.session import SessionContext
 from voiceassistant.tools.registry import build_tools
@@ -116,6 +117,8 @@ def build_pipeline(
                 use_cuda=False,
             )
         )
+        if persona.voice_pitch:
+            stages.append(PitchShift(semitones=persona.voice_pitch))
 
     stages.append(bundle.output)
     stages.append(aggregators.assistant())

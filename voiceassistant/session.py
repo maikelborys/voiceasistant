@@ -24,6 +24,7 @@ class SessionContext:
     persona_id: str
     transport_kind: TransportKind
     started_at: datetime = field(default_factory=datetime.now)
+    toy_mode: bool = False
 
     @classmethod
     def new(
@@ -33,6 +34,7 @@ class SessionContext:
         device_id: str,
         user_id: str,
         persona_id: str,
+        toy_mode: bool = False,
     ) -> "SessionContext":
         return cls(
             session_id=str(uuid.uuid4()),
@@ -40,6 +42,7 @@ class SessionContext:
             user_id=user_id,
             persona_id=persona_id,
             transport_kind=transport_kind,
+            toy_mode=toy_mode,
         )
 
     @property

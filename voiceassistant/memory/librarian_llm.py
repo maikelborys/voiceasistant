@@ -34,7 +34,7 @@ from voiceassistant.wiki.store import read_page, write_page
 _TOPIC_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
-def _load_context(root: Path, user_id: str) -> dict[str, str]:
+def _load_context(root: Path, user_id: str, toy_mode: bool = False) -> dict[str, str]:
     """Gather the librarian's read-only inputs as a {relpath: body} map."""
     ctx: dict[str, str] = {}
 
@@ -49,11 +49,16 @@ def _load_context(root: Path, user_id: str) -> dict[str, str]:
     person = read_page(person_rel)
     ctx[person_rel + " (current)"] = (person or "").strip() or "(empty — create it)"
 
-    topics_dir = root / "topics"
-    if topics_dir.exists():
-        for p in sorted(topics_dir.glob("*.md")):
-            rel = f"topics/{p.name}"
-            ctx[rel + " (current)"] = p.read_text(encoding="utf-8").strip()
+    # Toy mode: don't pull topic ontology into context. The adult wiki and
+    # the child wiki share one filesystem, and feeding Maikel's topics into
+    # Emma's librarian pass would both waste context and risk leaking
+    # adult-shaped memory into a child persona.
+    if not toy_mode:
+        topics_dir = root / "topics"
+        if topics_dir.exists():
+            for p in sorted(topics_dir.glob("*.md")):
+                rel = f"topics/{p.name}"
+                ctx[rel + " (current)"] = p.read_text(encoding="utf-8").strip()
 
     schema = read_page("schema.md")
     if schema:
@@ -62,7 +67,27 @@ def _load_context(root: Path, user_id: str) -> dict[str, str]:
     return ctx
 
 
-def _build_prompt(ctx: dict[str, str], user_id: str) -> str:
+def _build_prompt(ctx: dict[str, str], user_id: str, toy_mode: bool = False) -> str:
+    if toy_mode:
+        allowed_rule = (
+            "4. Allowed output path: 'people/" + user_id + ".md' ONLY. "
+            "Do NOT emit any 'topics/*.md' page — topics are rejected in toy mode."
+        )
+        xref_rule = (
+            "7. Do not emit [[topics/...]] wikilinks in toy mode — there are no "
+            "topic pages. Keep the person page self-contained."
+        )
+    else:
+        allowed_rule = (
+            "4. Allowed output paths: 'people/" + user_id + ".md' and "
+            "'topics/<slug>.md' (slug matches [a-z0-9][a-z0-9-]*). "
+            "Any other path will be rejected."
+        )
+        xref_rule = (
+            "7. Cross-link with [[topics/<slug>]] wikilinks from the person page to "
+            "topic pages; topic pages link back to [[people/" + user_id + "]]."
+        )
+
     parts = [
         "You are the end-of-session librarian for a personal voice assistant's wiki.",
         f"Today is {date.today().isoformat()}. The active user is '{user_id}'.",
@@ -75,8 +100,7 @@ def _build_prompt(ctx: dict[str, str], user_id: str) -> str:
         "   lines; trust that filter and do not speculate about what the bot said.",
         "3. Recency wins: if a newer user statement contradicts an older fact on",
         "   an existing page, replace the older fact (don't keep both).",
-        "4. Allowed output paths: 'people/" + user_id + ".md' and 'topics/<slug>.md'",
-        "   (slug matches [a-z0-9][a-z0-9-]*). Any other path will be rejected.",
+        allowed_rule,
         "5. Re-emit each touched page in full. Preserve prior-day facts unchanged",
         "   unless today's user statements contradict them.",
         "6. For each promoted fact on a page, include the source quote inline",
@@ -84,8 +108,7 @@ def _build_prompt(ctx: dict[str, str], user_id: str) -> str:
         "       ## Favorite color",
         "       Green.",
         "       > [HH:MM:SS] \"mi color favorito es verde\"",
-        "7. Cross-link with [[topics/<slug>]] wikilinks from the person page to",
-        "   topic pages; topic pages link back to [[people/" + user_id + "]].",
+        xref_rule,
         "8. If no promotable user facts appeared today, return exactly {}.",
         "",
         "OUTPUT FORMAT — ONE JSON object, no prose outside it. Keys are",
@@ -131,9 +154,11 @@ async def _call_ollama(prompt: str) -> dict[str, str] | None:
     return {k: v for k, v in obj.items() if isinstance(k, str) and isinstance(v, str)}
 
 
-def _is_allowed_path(relpath: str, user_id: str) -> bool:
+def _is_allowed_path(relpath: str, user_id: str, toy_mode: bool = False) -> bool:
     if relpath == f"people/{user_id}.md":
         return True
+    if toy_mode:
+        return False
     if relpath.startswith("topics/") and relpath.endswith(".md"):
         slug = relpath[len("topics/") : -len(".md")]
         if _TOPIC_SLUG.match(slug):
@@ -158,19 +183,19 @@ async def run(session: SessionContext, root: Path | None = None) -> None:
         if not root.exists():
             return
 
-        ctx = _load_context(root, session.user_id)
+        ctx = _load_context(root, session.user_id, session.toy_mode)
         if not ctx:
             logger.debug("librarian: no user statements today, skipping")
             return
 
-        prompt = _build_prompt(ctx, session.user_id)
+        prompt = _build_prompt(ctx, session.user_id, session.toy_mode)
         patch = await _call_ollama(prompt)
         if not patch:
             return
 
         written: list[str] = []
         for relpath, new_content in patch.items():
-            if not _is_allowed_path(relpath, session.user_id):
+            if not _is_allowed_path(relpath, session.user_id, session.toy_mode):
                 logger.warning(f"librarian: refusing disallowed path '{relpath}'")
                 continue
             if not new_content.strip():

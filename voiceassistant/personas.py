@@ -22,6 +22,7 @@ class Persona:
     language: str | None = None
     whisper_model: str | None = None
     whisper_compute_type: str | None = None
+    voice_pitch: float | None = None
 
 
 def _parse_persona_markdown(persona_id: str, text: str) -> Persona:
@@ -48,6 +49,7 @@ def _parse_persona_markdown(persona_id: str, text: str) -> Persona:
         language=meta.get("language") or None,
         whisper_model=meta.get("whisper_model") or None,
         whisper_compute_type=meta.get("whisper_compute_type") or None,
+        voice_pitch=float(meta["voice_pitch"]) if meta.get("voice_pitch") else None,
     )
 
 

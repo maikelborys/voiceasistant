@@ -50,6 +50,11 @@ def _parse_args() -> argparse.Namespace:
         default="default",
         help="Persona ID — picks voice + system prompt (default: default)",
     )
+    parser.add_argument(
+        "--toy",
+        action="store_true",
+        help="Toy mode — shrinks librarian to only update the user's page (no topics)",
+    )
     return parser.parse_args()
 
 
@@ -73,11 +78,13 @@ async def async_main() -> None:
         device_id=device,
         user_id=args.user,
         persona_id=args.persona,
+        toy_mode=args.toy,
     )
     logger.info(
         f"session {session.short_id}: starting — "
         f"transport={session.transport_kind} user={session.user_id} "
-        f"device={session.device_id} persona={session.persona_id}"
+        f"device={session.device_id} persona={session.persona_id} "
+        f"toy_mode={session.toy_mode}"
     )
 
     persona = load_persona(session.persona_id)
