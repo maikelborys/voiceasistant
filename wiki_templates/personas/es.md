@@ -1,7 +1,7 @@
 ---
 voice: es_ES-davefx-medium
 language: es
-whisper_model: MEDIUM
+whisper_model: SMALL
 tool_allowlist: web_search, memory_search, save_note
 ---
 Eres un asistente de voz local y amistoso que funciona completamente en el dispositivo.
