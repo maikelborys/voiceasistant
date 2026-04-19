@@ -15,6 +15,7 @@ from loguru import logger
 from pipecat.pipeline.runner import PipelineRunner
 
 from voiceassistant import config
+from voiceassistant.memory import librarian_llm
 from voiceassistant.memory.build_index import ensure_fresh as ensure_index_fresh
 from voiceassistant.personas import load_persona
 from voiceassistant.pipeline import build_pipeline
@@ -89,7 +90,10 @@ async def async_main() -> None:
     )
     if session.transport_kind == "local_audio":
         logger.info("Speak into your microphone.")
-    await PipelineRunner().run(task)
+    try:
+        await PipelineRunner().run(task)
+    finally:
+        await librarian_llm.run(session, wiki)
 
 
 def main() -> None:
