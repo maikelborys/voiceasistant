@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import httpx
@@ -67,17 +67,29 @@ def _build_prompt(ctx: dict[str, str], user_id: str) -> str:
         "You are the end-of-session librarian for a personal voice assistant's wiki.",
         f"Today is {date.today().isoformat()}. The active user is '{user_id}'.",
         "",
-        "Follow the promotion rules in schema.md exactly. In particular:",
-        "- Promote only user-stated facts (never bot claims).",
-        "- Recency wins: newer statements replace contradicted older facts.",
-        "- Allowed output paths: 'people/" + user_id + ".md' and 'topics/<slug>.md' "
-        "(slug matches [a-z0-9][a-z0-9-]*). Nothing else.",
-        "- Re-emit each page in full. Keep prior-day facts unless today contradicts them.",
-        "- Cross-link with [[topics/<slug>]] wikilinks where relevant.",
-        "- If no promotable facts appeared today, return an empty JSON object: {}.",
+        "HARD RULES — violating any of these is worse than returning {}:",
+        "1. NEVER invent facts. Every statement you promote MUST be directly",
+        "   supported by a verbatim substring of a user bullet in the input.",
+        "   If you cannot quote the user saying it, do not write it.",
+        "2. NEVER promote bot claims. The input already filters to user-only",
+        "   lines; trust that filter and do not speculate about what the bot said.",
+        "3. Recency wins: if a newer user statement contradicts an older fact on",
+        "   an existing page, replace the older fact (don't keep both).",
+        "4. Allowed output paths: 'people/" + user_id + ".md' and 'topics/<slug>.md'",
+        "   (slug matches [a-z0-9][a-z0-9-]*). Any other path will be rejected.",
+        "5. Re-emit each touched page in full. Preserve prior-day facts unchanged",
+        "   unless today's user statements contradict them.",
+        "6. For each promoted fact on a page, include the source quote inline",
+        "   as a blockquote, e.g.:",
+        "       ## Favorite color",
+        "       Green.",
+        "       > [HH:MM:SS] \"mi color favorito es verde\"",
+        "7. Cross-link with [[topics/<slug>]] wikilinks from the person page to",
+        "   topic pages; topic pages link back to [[people/" + user_id + "]].",
+        "8. If no promotable user facts appeared today, return exactly {}.",
         "",
-        "Respond with ONE JSON object whose keys are wiki-relative paths and values",
-        "are the complete new Markdown content of that file. No prose outside the JSON.",
+        "OUTPUT FORMAT — ONE JSON object, no prose outside it. Keys are",
+        "wiki-relative paths; values are complete new Markdown content.",
         "",
         "--- inputs ---",
     ]
@@ -97,7 +109,7 @@ async def _call_ollama(prompt: str) -> dict[str, str] | None:
                     "messages": [{"role": "user", "content": prompt}],
                     "format": "json",
                     "stream": False,
-                    "options": {"temperature": 0.2},
+                    "options": {"temperature": 0.0},
                 },
             )
             resp.raise_for_status()
@@ -133,7 +145,8 @@ def _snapshot(root: Path, relpath: str) -> None:
     src = root / relpath
     if not src.exists():
         return
-    dst = root / ".history" / date.today().isoformat() / relpath
+    stamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    dst = root / ".history" / date.today().isoformat() / stamp / relpath
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
 

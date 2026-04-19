@@ -185,7 +185,16 @@ class VectorRetrieval(FrameProcessor):
             blocks.append(block)
             remaining -= len(block)
 
-        new_system = self._base_prompt + "".join(blocks)
+        if blocks:
+            header = (
+                "\n\nThe pages below are your memory for this user and session. "
+                "Treat them as factual when answering questions about the user, "
+                "their preferences, or prior conversations. When they are silent, "
+                "answer from your own knowledge while staying in character."
+            )
+            new_system = self._base_prompt + header + "".join(blocks)
+        else:
+            new_system = self._base_prompt
         messages = self._context.messages
         if messages and messages[0].get("role") == "system":
             messages[0] = {"role": "system", "content": new_system}
