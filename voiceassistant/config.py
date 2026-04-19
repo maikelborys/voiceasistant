@@ -18,6 +18,14 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-ctx4k")
 OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.7"))
 
+# OpenRouter (OpenAI-compatible) — cloud opt-in via --llm openrouter/<model>.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = os.environ.get(
+    "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+)
+# Default LLM spec if --llm not supplied. "local" resolves to OLLAMA_MODEL.
+LLM_DEFAULT_SPEC = os.environ.get("LLM_DEFAULT_SPEC", "local")
+
 # --- Embeddings (nomic-embed-text via Ollama) ---
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
 

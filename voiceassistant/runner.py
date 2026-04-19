@@ -55,6 +55,15 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Toy mode — shrinks librarian to only update the user's page (no topics)",
     )
+    parser.add_argument(
+        "--llm",
+        default=config.LLM_DEFAULT_SPEC,
+        help=(
+            "LLM backend spec: 'local' | 'ollama[/<model>]' | "
+            "'openrouter/<model>' (e.g. openrouter/anthropic/claude-sonnet-4.5). "
+            "Default: local."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -89,7 +98,7 @@ async def async_main() -> None:
 
     persona = load_persona(session.persona_id)
     bundle = make_transport(session)
-    task = build_pipeline(session, bundle, persona)
+    task = build_pipeline(session, bundle, persona, llm_spec=args.llm)
 
     logger.info(
         f"session {session.short_id}: ready — "

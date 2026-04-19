@@ -131,6 +131,20 @@ CLI flags — all optional:
 | `--user` | `maikel` | `wiki/people/<user>.md` |
 | `--device` | depends on transport | `wiki/devices/<device>.md` |
 | `--persona` | `default` | `wiki/personas/<persona>.md` (voice + system prompt) |
+| `--llm` | `local` | `local`, `ollama[/<model>]`, `openrouter/<model>` |
+
+### Optional: cloud LLM via OpenRouter
+
+STT and TTS always stay on-device. The LLM can optionally hit OpenRouter
+when you want a smarter model for a one-off run:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...   # put in .env or your shell rc
+uv run python bot.py --transport text --llm openrouter/anthropic/claude-sonnet-4.5
+```
+
+Per-turn routing rules live in `wiki/routing.md`; see that file for the
+format. Unset `OPENROUTER_API_KEY` + no `--llm openrouter/...` = fully local.
 
 ## 8. Wiki (agent memory)
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Fully-local, on-device voice assistant. Mic → Silero VAD → faster-whisper (CUDA) → Ollama `llama3.1:8b` → Piper TTS (CPU) → speakers. Orchestrated by Pipecat 1.0. No cloud calls — privacy constraint is a hard requirement, do not propose OpenAI/Anthropic/Google STT/LLM/TTS.
+Fully-local, on-device voice assistant. Mic → Silero VAD → faster-whisper (CUDA) → Ollama `llama3.1:8b` → Piper TTS (CPU) → speakers. Orchestrated by Pipecat 1.0. **Local by default; cloud LLM is opt-in per run via `--llm openrouter/<model>`** (requires `OPENROUTER_API_KEY`). STT and TTS must stay local (audio privacy); do not propose OpenAI/Anthropic/Google STT/TTS.
 
 Full install story (apt packages, uv commands, model downloads, known gotchas) lives in `SETUP.md`. Keep it updated when system-level deps change.
 
@@ -15,6 +15,8 @@ Full install story (apt packages, uv commands, model downloads, known gotchas) l
 uv run python bot.py                              # defaults to local_audio
 uv run python bot.py --transport text             # text stdin/stdout — fast debug
 uv run python bot.py --help                       # all flags
+OPENROUTER_API_KEY=sk-or-... uv run python bot.py --transport text \
+    --llm openrouter/anthropic/claude-sonnet-4.5  # cloud LLM, local STT/TTS still
 
 # Microphone diagnostic — prints RMS per input device so we know the mic is live
 uv run python mic_probe.py

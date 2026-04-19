@@ -6,10 +6,13 @@ Given a SessionContext and a TransportBundle, wires up:
     → SpeechEventLogger
     → [WhisperSTT if bundle.needs_stt]
     → aggregators.user()            (VAD + user-mute gated by bundle flags)
-    → OLLamaLLMService
-    → [PiperTTS if bundle.needs_tts]
+    → VectorRetrieval
+    → ModelRouter                   (per-turn backend/model override)
+    → LLMService                    (Ollama or OpenRouter, tools registered)
+    → [PiperTTS / KokoroTTS if bundle.needs_tts]
     → bundle.output
     → aggregators.assistant()
+    → WikiLibrarian
 
 Persona + wiki-retrieval + librarian splice in during steps 4, 6, 7.
 """
@@ -26,7 +29,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.services.kokoro.tts import KokoroTTSService
-from pipecat.services.ollama.llm import OLLamaLLMService
 from pipecat.services.piper.tts import PiperTTSService
 from pipecat.services.whisper.stt import Model as WhisperModel
 from pipecat.services.whisper.stt import WhisperSTTService
@@ -34,11 +36,13 @@ from pipecat.transcriptions.language import Language
 from pipecat.turns.user_mute import AlwaysUserMuteStrategy
 
 from voiceassistant import config
+from voiceassistant.llm_factory import build_llm
 from voiceassistant.personas import Persona
 from voiceassistant.processors.speech_logger import SpeechEventLogger
 from voiceassistant.processors.vector_retrieval import VectorRetrieval
 from voiceassistant.processors.voice_effect import PitchShift
 from voiceassistant.processors.wiki_librarian import WikiLibrarian
+from voiceassistant.routing import ModelRouter
 from voiceassistant.session import SessionContext
 from voiceassistant.tools.registry import build_tools
 from voiceassistant.transports import TransportBundle
@@ -47,7 +51,11 @@ from loguru import logger
 
 
 def build_pipeline(
-    session: SessionContext, bundle: TransportBundle, persona: Persona
+    session: SessionContext,
+    bundle: TransportBundle,
+    persona: Persona,
+    *,
+    llm_spec: str = "local",
 ) -> PipelineTask:
     stages = [bundle.input, SpeechEventLogger()]
 
@@ -99,15 +107,12 @@ def build_pipeline(
         )
     )
 
-    llm = OLLamaLLMService(
-        settings=OLLamaLLMService.Settings(
-            model=config.OLLAMA_MODEL, temperature=config.OLLAMA_TEMPERATURE
-        ),
-    )
+    llm = build_llm(llm_spec)
     for name, handler in tool_handlers.items():
         llm.register_function(name, handler)
     if tool_handlers:
         logger.info(f"tools registered: {', '.join(tool_handlers)}")
+    stages.append(ModelRouter(llm=llm, default_spec=llm_spec))
     stages.append(llm)
 
     if bundle.needs_tts:
