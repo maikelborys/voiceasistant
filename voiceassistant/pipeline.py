@@ -33,6 +33,7 @@ from pipecat.turns.user_mute import AlwaysUserMuteStrategy
 from voiceassistant import config
 from voiceassistant.personas import Persona
 from voiceassistant.processors.speech_logger import SpeechEventLogger
+from voiceassistant.processors.wiki_librarian import WikiLibrarian
 from voiceassistant.processors.wiki_retrieval import WikiRetrieval
 from voiceassistant.session import SessionContext
 from voiceassistant.transports import TransportBundle
@@ -92,6 +93,7 @@ def build_pipeline(
 
     stages.append(bundle.output)
     stages.append(aggregators.assistant())
+    stages.append(WikiLibrarian(session=session, context=context))
 
     pipeline = Pipeline(stages)
     return PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
