@@ -32,7 +32,9 @@ def make_transport(session: SessionContext) -> TransportBundle:
 
         return build_local_audio_bundle(session)
     if session.transport_kind == "text":
-        raise NotImplementedError("Text transport lands in step 5 of the Phase 8 plan.")
+        from voiceassistant.transports.text import build_text_bundle
+
+        return build_text_bundle(session)
     if session.transport_kind == "websocket":
         raise NotImplementedError(
             "WebSocket transport scheduled for Phase 9 (ESP32 frontend)."
