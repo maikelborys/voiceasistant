@@ -37,7 +37,10 @@ from voiceassistant.processors.speech_logger import SpeechEventLogger
 from voiceassistant.processors.vector_retrieval import VectorRetrieval
 from voiceassistant.processors.wiki_librarian import WikiLibrarian
 from voiceassistant.session import SessionContext
+from voiceassistant.tools.registry import build_tools
 from voiceassistant.transports import TransportBundle
+
+from loguru import logger
 
 
 def build_pipeline(
@@ -60,7 +63,13 @@ def build_pipeline(
             )
         )
 
-    context = LLMContext(messages=[{"role": "system", "content": persona.system_prompt}])
+    tools_schema, tool_handlers = build_tools(persona.tool_allowlist)
+    context_kwargs: dict = {
+        "messages": [{"role": "system", "content": persona.system_prompt}],
+    }
+    if tools_schema is not None:
+        context_kwargs["tools"] = tools_schema
+    context = LLMContext(**context_kwargs)
     user_params_kwargs: dict = {}
     if bundle.needs_vad:
         user_params_kwargs["vad_analyzer"] = SileroVADAnalyzer()
@@ -85,6 +94,10 @@ def build_pipeline(
             model=config.OLLAMA_MODEL, temperature=config.OLLAMA_TEMPERATURE
         ),
     )
+    for name, handler in tool_handlers.items():
+        llm.register_function(name, handler)
+    if tool_handlers:
+        logger.info(f"tools registered: {', '.join(tool_handlers)}")
     stages.append(llm)
 
     if bundle.needs_tts:
