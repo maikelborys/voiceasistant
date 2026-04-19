@@ -1,16 +1,43 @@
 """Pick which wiki pages to inject into the LLM system prompt.
 
-MVP set: active persona + active device + active user + last block of
-today's daily log. Missing pages are silently skipped. Keyword-based
-suggestion from `index.md` is a later phase.
+MVP set: active persona + active device + active user + today's user
+statements (from daily log). Missing pages are silently skipped. Char
+budget enforcement lives in `WikiRetrieval`.
+
+Why only user statements from the daily log, not the whole log:
+injecting the bot's prior responses creates a hallucination feedback
+loop — a wrong answer in one session gets read as truth in the next and
+repeated. User statements are the closest thing to durable facts we
+have until an LLM librarian promotes them to `people/<user>.md`
+(Phase 8.3). This is the raw-source-as-ground-truth shortcut.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from voiceassistant.session import SessionContext
 from voiceassistant.wiki.store import read_page
+
+_USER_LINE = re.compile(r"^\*\*user:\*\*\s*(.+)$", re.MULTILINE)
+_BLOCK_HEADER = re.compile(r"^## (\d{2}:\d{2}:\d{2}) — ", re.MULTILINE)
+
+
+def _user_statements_from_daily(daily: str) -> str:
+    """Extract only `## HH:MM:SS` + `**user:** ...` lines, drop bot responses."""
+    lines: list[str] = []
+    current_ts: str | None = None
+    for line in daily.splitlines():
+        header = _BLOCK_HEADER.match(line)
+        if header:
+            current_ts = header.group(1)
+            continue
+        user = _USER_LINE.match(line)
+        if user and current_ts:
+            lines.append(f"- [{current_ts}] {user.group(1).strip()}")
+            current_ts = None
+    return "\n".join(lines)
 
 
 def pages_for_session(session: SessionContext) -> list[tuple[str, str]]:
@@ -27,11 +54,10 @@ def pages_for_session(session: SessionContext) -> list[tuple[str, str]]:
 
     today = date.today().isoformat()
     daily = read_page(f"daily/{today}.md")
-    if daily is not None:
-        blocks = [b for b in daily.strip().split("\n## ") if b.strip()]
-        if blocks:
-            last = blocks[-1]
-            if not last.startswith("## "):
-                last = "## " + last
-            out.append((f"daily/{today}.md (most recent turn)", last.strip()))
+    if daily is not None and daily.strip():
+        user_only = _user_statements_from_daily(daily)
+        if user_only:
+            out.append(
+                (f"daily/{today}.md (today's user statements)", user_only)
+            )
     return out
