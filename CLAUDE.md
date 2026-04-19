@@ -57,7 +57,7 @@ voiceassistant/
 └── wiki/
     ├── paths.py             # wiki_dir() + ensure_wiki_seeded() (copies wiki_templates/)
     ├── store.py             # read_page / write_page / append_page
-    ├── retriever.py         # pages_for_session() — persona + device + user + last daily block
+    ├── retriever.py         # pages_for_session() — persona + device + user + today's user statements
     └── librarian.py         # append_daily_log() — structured turn blocks + log.md line
 ```
 
@@ -84,7 +84,11 @@ Key load-bearing details:
 
 6. **Wiki auto-seeds on first run.** `ensure_wiki_seeded()` copies `wiki_templates/` (tracked) → `wiki/` (gitignored). Edit pages freely; never commit `wiki/`. Override location with `WIKI_DIR=/path/to/wiki`.
 
-7. **Identity lives at the transport layer, not in the LLM.** Every session carries `device_id` / `user_id` / `persona_id`; the LLM never decides who it's talking to. For multi-toy (Phase 9), each WebSocket connection will carry those fields in query params.
+7. **Retrieval strips bot lines from daily log.** `wiki/retriever.py` injects persona/device/user pages + *today's user statements only* (as a bulleted list with timestamps). We deliberately do NOT feed the bot's prior responses back into the system prompt — that would be a hallucination feedback loop (one wrong answer becomes "truth" for the next session). User statements are the closest thing to durable facts until an LLM librarian promotes them to `people/<user>.md` (Phase 8.3). `WIKI_INJECT_BUDGET_CHARS` defaults to 8000.
+
+8. **Text transport uses `asyncio.StreamReader` + `EndTaskFrame` upstream.** `run_in_executor(sys.stdin.readline)` is uncancellable (blocked thread on `read()`) and leaves dangling tasks on Ctrl+C. `EndFrame` pushed downstream didn't actually stop the pipeline — `EndTaskFrame` pushed UPSTREAM is the graceful shutdown signal.
+
+9. **Identity lives at the transport layer, not in the LLM.** Every session carries `device_id` / `user_id` / `persona_id`; the LLM never decides who it's talking to. For multi-toy (Phase 9), each WebSocket connection will carry those fields in query params.
 
 ## Memory and plan
 

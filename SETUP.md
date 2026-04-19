@@ -118,12 +118,28 @@ CLI flags — all optional:
 
 First run auto-copies `wiki_templates/` → `wiki/` (gitignored). Edit the pages
 to teach the assistant about yourself, your devices, and your personas.
-Every turn, the active persona/device/user pages and the most recent daily
-log block are injected into the LLM system prompt. Every turn appends a
-block to `wiki/daily/<today>.md` and a line to `wiki/log.md`.
 
+Each turn:
+- **Pre-LLM (retrieval)** — the active `personas/<persona>.md`, `devices/<device>.md`,
+  `people/<user>.md`, plus today's **user statements** (extracted from the daily
+  log) are injected into the LLM system prompt. Bot responses from prior turns
+  are deliberately stripped to avoid a hallucination feedback loop.
+- **Post-LLM (librarian)** — the turn is appended as a timestamped block to
+  `wiki/daily/<today>.md` and a one-line summary to `wiki/log.md`.
+
+Budget: `WIKI_INJECT_BUDGET_CHARS` (default 8000) caps the injected prompt.
 Point `WIKI_DIR` at a different folder if you want to share a wiki across
 checkouts or back it up to a synced drive.
+
+Quick test that memory persists:
+```bash
+uv run python bot.py --transport text
+> my morning routine is 10 situps, 5 jumps, 3 turns
+> ^D                                    # Ctrl+D exits cleanly
+uv run python bot.py --transport text   # fresh session
+> what's my morning routine?
+# → "10 situps, 5 jumps, 3 turns" (recalled from today's log)
+```
 
 ---
 
