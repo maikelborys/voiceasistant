@@ -33,6 +33,19 @@ _SKIP_DIR_NAMES = {".history", ".obsidian"}
 # log.md is the append-only turn-audit trail (contains bot responses) — never
 # index it; would reintroduce hallucinated bot claims into retrieval context.
 _SKIP_FILES = {"log.md"}
+# nomic-embed-text in Ollama rejects inputs past its context window with a
+# 400 before respecting num_ctx overrides. Empirically ~5.8k chars trips it;
+# cap well under that with headroom for multi-byte scripts.
+_MAX_EMBED_CHARS = 3500
+
+
+def _cap_for_embed(relpath: str, text: str) -> str:
+    if len(text) <= _MAX_EMBED_CHARS:
+        return text
+    # Daily logs grow chronologically — keep the tail so recent statements win.
+    if relpath.startswith("daily/"):
+        return text[-_MAX_EMBED_CHARS:]
+    return text[:_MAX_EMBED_CHARS]
 
 
 def _index_path(root: Path) -> Path:
@@ -80,6 +93,7 @@ async def _rebuild(root: Path, full: bool = False) -> tuple[int, int]:
                 text = _user_statements_from_daily(text)
             if not text.strip():
                 continue
+            text = _cap_for_embed(relpath, text)
             to_embed.append((relpath, path, mtime, text))
 
         if not to_embed:
@@ -115,6 +129,7 @@ async def upsert_path(root: Path, relpath: str) -> None:
         text = _user_statements_from_daily(text)
     if not text.strip():
         return
+    text = _cap_for_embed(relpath, text)
     vec = await embeddings.aembed(text)
     with index.open_index(_index_path(root)) as conn:
         index.upsert(
