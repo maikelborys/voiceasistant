@@ -23,6 +23,15 @@ WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "DISTIL_MEDIUM_EN")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cuda")
 WHISPER_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "float16")
 
+# --- VAD (Silero) ---
+# stop_secs of silence before VAD calls a turn done. Pipecat's default is
+# 0.2 which cuts speakers mid-pause; 0.8 forgives natural thinking pauses
+# without feeling laggy. start_secs stays at 0.2 to still catch fast starts.
+VAD_STOP_SECS = float(os.environ.get("VAD_STOP_SECS", "0.8"))
+VAD_START_SECS = float(os.environ.get("VAD_START_SECS", "0.2"))
+VAD_CONFIDENCE = float(os.environ.get("VAD_CONFIDENCE", "0.7"))
+VAD_MIN_VOLUME = float(os.environ.get("VAD_MIN_VOLUME", "0.6"))
+
 # --- TTS (Piper) ---
 PIPER_VOICE_DEFAULT = os.environ.get("PIPER_VOICE_DEFAULT", "en_US-lessac-medium")
 

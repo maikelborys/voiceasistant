@@ -17,6 +17,7 @@ Persona + wiki-retrieval + librarian splice in during steps 4, 6, 7.
 from __future__ import annotations
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -72,7 +73,14 @@ def build_pipeline(
     context = LLMContext(**context_kwargs)
     user_params_kwargs: dict = {}
     if bundle.needs_vad:
-        user_params_kwargs["vad_analyzer"] = SileroVADAnalyzer()
+        user_params_kwargs["vad_analyzer"] = SileroVADAnalyzer(
+            params=VADParams(
+                stop_secs=config.VAD_STOP_SECS,
+                start_secs=config.VAD_START_SECS,
+                confidence=config.VAD_CONFIDENCE,
+                min_volume=config.VAD_MIN_VOLUME,
+            )
+        )
     if bundle.wants_user_mute:
         user_params_kwargs["user_mute_strategies"] = [AlwaysUserMuteStrategy()]
     aggregators = LLMContextAggregatorPair(
