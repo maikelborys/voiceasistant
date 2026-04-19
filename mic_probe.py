@@ -10,6 +10,8 @@ import time
 
 import pyaudio
 
+from voiceassistant.audio_devices import list_devices
+
 CHUNK = 1024
 RATE = 16000
 DURATION_SEC = 3.0
@@ -54,23 +56,14 @@ def main():
     parser.add_argument("--index", type=int, default=None, help="Only probe this device index")
     args = parser.parse_args()
 
-    pa = pyaudio.PyAudio()
-    try:
-        devs = [
-            (i, pa.get_device_info_by_index(i))
-            for i in range(pa.get_device_count())
-        ]
-    finally:
-        pa.terminate()
-
-    inputs = [(i, d) for (i, d) in devs if d["maxInputChannels"] > 0]
+    inputs = [d for d in list_devices() if d.is_input]
     if args.index is not None:
-        inputs = [(i, d) for (i, d) in inputs if i == args.index]
+        inputs = [d for d in inputs if d.index == args.index]
 
     print(f"Speak continuously — each device probed for {DURATION_SEC}s.")
-    for i, d in inputs:
-        print(f"-> probing [{i}] {d['name']} ...")
-        probe(i, d["name"])
+    for d in inputs:
+        print(f"-> probing [{d.index}] {d.name} ...")
+        probe(d.index, d.name)
 
 
 if __name__ == "__main__":
