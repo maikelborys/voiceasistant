@@ -25,3 +25,6 @@ models/
 
 # Claude Code local settings (personal; don't push)
 .claude/settings.local.json
+
+# Wiki — user's private agent memory (auto-seeded from wiki_templates/)
+/wiki/

@@ -15,9 +15,11 @@ from loguru import logger
 from pipecat.pipeline.runner import PipelineRunner
 
 from voiceassistant import config
+from voiceassistant.personas import load_persona
 from voiceassistant.pipeline import build_pipeline
 from voiceassistant.session import SessionContext, TransportKind
 from voiceassistant.transports import make_transport
+from voiceassistant.wiki.paths import ensure_wiki_seeded
 
 
 def _parse_args() -> argparse.Namespace:
@@ -59,6 +61,9 @@ async def async_main() -> None:
     logger.remove()
     logger.add(sys.stderr, level=config.LOG_LEVEL)
 
+    wiki = ensure_wiki_seeded()
+    logger.debug(f"wiki: {wiki}")
+
     device = args.device or _default_device_for(args.transport)
     session = SessionContext.new(
         transport_kind=args.transport,
@@ -72,8 +77,9 @@ async def async_main() -> None:
         f"device={session.device_id} persona={session.persona_id}"
     )
 
+    persona = load_persona(session.persona_id)
     bundle = make_transport(session)
-    task = build_pipeline(session, bundle)
+    task = build_pipeline(session, bundle, persona)
 
     logger.info(
         f"session {session.short_id}: ready — "

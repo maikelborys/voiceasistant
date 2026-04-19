@@ -31,17 +31,15 @@ from pipecat.services.whisper.stt import WhisperSTTService
 from pipecat.turns.user_mute import AlwaysUserMuteStrategy
 
 from voiceassistant import config
+from voiceassistant.personas import Persona
 from voiceassistant.processors.speech_logger import SpeechEventLogger
 from voiceassistant.session import SessionContext
 from voiceassistant.transports import TransportBundle
 
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a friendly local voice assistant running entirely on-device. "
-    "Reply in one or two short sentences — your answers will be spoken aloud."
-)
 
-
-def build_pipeline(session: SessionContext, bundle: TransportBundle) -> PipelineTask:
+def build_pipeline(
+    session: SessionContext, bundle: TransportBundle, persona: Persona
+) -> PipelineTask:
     stages = [bundle.input, SpeechEventLogger()]
 
     if bundle.needs_stt:
@@ -55,7 +53,7 @@ def build_pipeline(session: SessionContext, bundle: TransportBundle) -> Pipeline
             )
         )
 
-    context = LLMContext(messages=[{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}])
+    context = LLMContext(messages=[{"role": "system", "content": persona.system_prompt}])
     user_params_kwargs: dict = {}
     if bundle.needs_vad:
         user_params_kwargs["vad_analyzer"] = SileroVADAnalyzer()
@@ -77,7 +75,7 @@ def build_pipeline(session: SessionContext, bundle: TransportBundle) -> Pipeline
     if bundle.needs_tts:
         stages.append(
             PiperTTSService(
-                settings=PiperTTSService.Settings(voice=config.PIPER_VOICE_DEFAULT),
+                settings=PiperTTSService.Settings(voice=persona.piper_voice),
                 download_dir=config.MODELS_DIR,
                 use_cuda=False,
             )
