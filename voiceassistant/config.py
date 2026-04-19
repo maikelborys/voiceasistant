@@ -10,8 +10,12 @@ import os
 from pathlib import Path
 
 # --- LLM ---
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
 OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.7"))
+
+# --- Embeddings (nomic-embed-text via Ollama) ---
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
 
 # --- STT (faster-whisper) ---
 # Must be a name from pipecat.services.whisper.stt.Model enum.

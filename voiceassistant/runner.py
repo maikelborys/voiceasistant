@@ -15,6 +15,7 @@ from loguru import logger
 from pipecat.pipeline.runner import PipelineRunner
 
 from voiceassistant import config
+from voiceassistant.memory.build_index import ensure_fresh as ensure_index_fresh
 from voiceassistant.personas import load_persona
 from voiceassistant.pipeline import build_pipeline
 from voiceassistant.session import SessionContext, TransportKind
@@ -63,6 +64,7 @@ async def async_main() -> None:
 
     wiki = ensure_wiki_seeded()
     logger.debug(f"wiki: {wiki}")
+    await ensure_index_fresh(wiki)
 
     device = args.device or _default_device_for(args.transport)
     session = SessionContext.new(

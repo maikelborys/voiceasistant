@@ -1,8 +1,10 @@
 """Pick which wiki pages to inject into the LLM system prompt.
 
-MVP set: active persona + active device + active user + today's user
-statements (from daily log). Missing pages are silently skipped. Char
-budget enforcement lives in `WikiRetrieval`.
+Cold-path fallback used by `VectorRetrieval` when the sqlite-vec index
+is empty or embeddings are unavailable. Returns active persona +
+active device + active user + today's user statements (from daily
+log) as `(label, body)` pairs. Missing pages are silently skipped.
+Budget enforcement lives in the processor.
 
 Why only user statements from the daily log, not the whole log:
 injecting the bot's prior responses creates a hallucination feedback

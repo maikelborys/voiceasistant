@@ -11,5 +11,6 @@ dependencies = [
     "nvidia-cudnn-cu12>=9.21.0.82",
     "pipecat-ai[local,ollama,piper,silero,whisper]>=1.0.0",
     "python-dotenv>=1.2.2",
+    "sqlite-vec>=0.1.9",
     "websockets>=16.0",
 ]

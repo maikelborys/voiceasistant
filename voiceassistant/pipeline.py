@@ -34,8 +34,8 @@ from pipecat.turns.user_mute import AlwaysUserMuteStrategy
 from voiceassistant import config
 from voiceassistant.personas import Persona
 from voiceassistant.processors.speech_logger import SpeechEventLogger
+from voiceassistant.processors.vector_retrieval import VectorRetrieval
 from voiceassistant.processors.wiki_librarian import WikiLibrarian
-from voiceassistant.processors.wiki_retrieval import WikiRetrieval
 from voiceassistant.session import SessionContext
 from voiceassistant.transports import TransportBundle
 
@@ -72,7 +72,7 @@ def build_pipeline(
     )
     stages.append(aggregators.user())
     stages.append(
-        WikiRetrieval(
+        VectorRetrieval(
             session=session,
             context=context,
             base_system_prompt=persona.system_prompt,
