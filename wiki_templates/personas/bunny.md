@@ -1,5 +1,6 @@
 ---
-voice: es_ES-davefx-medium
+tts_engine: kokoro
+voice: ef_dora
 language: es
 whisper_model: LARGE_V3_TURBO
 whisper_compute_type: int8_float16

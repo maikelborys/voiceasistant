@@ -25,6 +25,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.services.kokoro.tts import KokoroTTSService
 from pipecat.services.ollama.llm import OLLamaLLMService
 from pipecat.services.piper.tts import PiperTTSService
 from pipecat.services.whisper.stt import Model as WhisperModel
@@ -110,13 +111,21 @@ def build_pipeline(
     stages.append(llm)
 
     if bundle.needs_tts:
-        stages.append(
-            PiperTTSService(
-                settings=PiperTTSService.Settings(voice=persona.piper_voice),
-                download_dir=config.MODELS_DIR,
-                use_cuda=False,
+        if persona.tts_engine == "kokoro":
+            kokoro_kwargs: dict = {
+                "settings": KokoroTTSService.Settings(voice=persona.piper_voice),
+            }
+            if persona.language:
+                kokoro_kwargs["settings"].language = Language(persona.language)
+            stages.append(KokoroTTSService(**kokoro_kwargs))
+        else:
+            stages.append(
+                PiperTTSService(
+                    settings=PiperTTSService.Settings(voice=persona.piper_voice),
+                    download_dir=config.MODELS_DIR,
+                    use_cuda=False,
+                )
             )
-        )
         if persona.voice_pitch:
             stages.append(PitchShift(semitones=persona.voice_pitch))
 
