@@ -97,10 +97,33 @@ Only two moving parts — Pipecat 1.0's `PiperTTSService` loads the voice **in-p
 ollama serve
 
 # Term B — the bot
-uv run python bot.py
+uv run python bot.py                          # defaults to local_audio
+uv run python bot.py --transport local_audio  # same as default
+uv run python bot.py --transport text         # text stdin/stdout, ~1s startup
+uv run python bot.py --help                   # all CLI flags
 ```
 
-Speak into the mic; you should hear a reply.
+Speak into the mic (local_audio) or type (text); you should get a reply.
+
+CLI flags — all optional:
+
+| flag | default | picks |
+|---|---|---|
+| `--transport` | `local_audio` | `text`, `local_audio`, `websocket` (stub) |
+| `--user` | `maikel` | `wiki/people/<user>.md` |
+| `--device` | depends on transport | `wiki/devices/<device>.md` |
+| `--persona` | `default` | `wiki/personas/<persona>.md` (voice + system prompt) |
+
+## 8. Wiki (agent memory)
+
+First run auto-copies `wiki_templates/` → `wiki/` (gitignored). Edit the pages
+to teach the assistant about yourself, your devices, and your personas.
+Every turn, the active persona/device/user pages and the most recent daily
+log block are injected into the LLM system prompt. Every turn appends a
+block to `wiki/daily/<today>.md` and a line to `wiki/log.md`.
+
+Point `WIKI_DIR` at a different folder if you want to share a wiki across
+checkouts or back it up to a synced drive.
 
 ---
 

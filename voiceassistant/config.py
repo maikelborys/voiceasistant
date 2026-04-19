@@ -30,4 +30,4 @@ MODELS_DIR = PROJECT_ROOT / "models" / "piper"
 WIKI_INJECT_BUDGET_CHARS = int(os.environ.get("WIKI_INJECT_BUDGET_CHARS", "4000"))
 
 # --- Logging ---
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "DEBUG")
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")

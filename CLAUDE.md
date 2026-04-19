@@ -12,7 +12,9 @@ Full install story (apt packages, uv commands, model downloads, known gotchas) l
 
 ```bash
 # Run the assistant (requires ollama systemd unit active)
-uv run python bot.py
+uv run python bot.py                              # defaults to local_audio
+uv run python bot.py --transport text             # text stdin/stdout — fast debug
+uv run python bot.py --help                       # all flags
 
 # Microphone diagnostic — prints RMS per input device so we know the mic is live
 uv run python mic_probe.py
@@ -27,21 +29,50 @@ systemctl status ollama
 curl -s http://localhost:11434/api/tags
 ```
 
-There are no tests and no lint config — this is a single-file prototype. Don't invent a test suite unless explicitly asked.
+There are no tests and no lint config. Don't invent a test suite unless explicitly asked.
 
 ## Architecture
 
-Single entrypoint `bot.py`. Everything wires up inside `main()`:
+`bot.py` is a 4-line shim: preload NVIDIA libs → `voiceassistant.runner.main()`.
+All real code lives in the `voiceassistant/` package:
 
-1. **`_preload_nvidia_libs()` runs before any pipecat import.** faster-whisper's `ctranslate2` backend `dlopen`s `libcublas.so.12` / `libcudnn*.so` from the `nvidia-*-cu12` pip wheels. Those `.so` files are in `site-packages/nvidia/*/lib/` which is NOT on `LD_LIBRARY_PATH`, and you cannot mutate `LD_LIBRARY_PATH` in-process. The fix is `ctypes.CDLL(..., RTLD_GLOBAL)` preloading in dependency order (cuda_runtime → cublas → cuda_nvrtc → cudnn). Do not move this call below the imports — it has to win the race against ctranslate2's own dlopen.
+```
+voiceassistant/
+├── preload.py               # ctypes CDLL(RTLD_GLOBAL) for CUDA libs — MUST run before any pipecat import
+├── session.py               # SessionContext (session_id, device_id, user_id, persona_id, transport_kind)
+├── config.py                # env-overridable defaults
+├── runner.py                # CLI parse → session → bundle → pipeline → run
+├── pipeline.py              # build_pipeline(session, bundle, persona) — transport-agnostic
+├── personas.py              # load_persona() — parses wiki/personas/<id>.md
+├── audio_devices.py         # shared PyAudio enumeration (also used by mic_probe.py)
+├── transports/
+│   ├── __init__.py          # TransportBundle + make_transport(session)
+│   ├── local_audio.py       # pipecat LocalAudioTransport bundle
+│   ├── text.py              # StdinTextInput + StdoutTextOutput bundle
+│   └── websocket.py         # stub (Phase 9, ESP32)
+├── processors/
+│   ├── speech_logger.py     # direction-arrow frame logger — KEEP IN PIPELINE
+│   ├── wiki_retrieval.py    # pre-LLM system-prompt injector
+│   └── wiki_librarian.py    # pipeline-tail daily-log appender
+└── wiki/
+    ├── paths.py             # wiki_dir() + ensure_wiki_seeded() (copies wiki_templates/)
+    ├── store.py             # read_page / write_page / append_page
+    ├── retriever.py         # pages_for_session() — persona + device + user + last daily block
+    └── librarian.py         # append_daily_log() — structured turn blocks + log.md line
+```
 
-2. **`SpeechEventLogger`** is a `FrameProcessor` placed right after `transport.input()`. It logs VAD / user-speaking / bot-speaking / mute-state / transcription frames with direction arrows (↑/↓). It's the fastest way to tell whether the pipeline is stuck. Keep it even when everything works — debugging without it is guesswork.
+Key load-bearing details:
 
-3. **Pipeline order is load-bearing**:
+1. **`preload_nvidia_libs()` runs before any pipecat import.** faster-whisper's `ctranslate2` backend `dlopen`s `libcublas.so.12` / `libcudnn*.so` from the `nvidia-*-cu12` pip wheels. Those `.so` files are in `site-packages/nvidia/*/lib/` which is NOT on `LD_LIBRARY_PATH`, and you cannot mutate `LD_LIBRARY_PATH` in-process. The fix is `ctypes.CDLL(..., RTLD_GLOBAL)` preloading in dependency order (cuda_runtime → cublas → cuda_nvrtc → cudnn). `bot.py` calls it first thing; do not move it below the `voiceassistant.runner` import.
+
+2. **`SpeechEventLogger`** sits right after `bundle.input` and logs VAD / speech-lifecycle / mute / transcription frames with direction arrows (↑/↓). Fastest way to tell whether the pipeline is stuck.
+
+3. **Pipeline order is load-bearing** (built in `voiceassistant/pipeline.py`):
    ```
-   transport.input() → SpeechEventLogger → stt → aggregators.user() → llm → tts → transport.output() → aggregators.assistant()
+   bundle.input → SpeechEventLogger → [stt] → aggregators.user() → WikiRetrieval
+     → llm → [tts] → bundle.output → aggregators.assistant() → WikiLibrarian
    ```
-   `aggregators.user()` must be between STT and LLM. `aggregators.assistant()` sits after `transport.output()` so it sees bot-speaking frames in the right order.
+   STT/TTS/VAD/user-mute are gated on `TransportBundle` flags — local_audio enables all four, text disables all four. `aggregators.user()` must sit between STT and LLM. `WikiRetrieval` mutates `messages[0]` on every `UserStartedSpeakingFrame`. `WikiLibrarian` writes on `LLMContextAssistantTimestampFrame` (the downstream-facing commit signal — `LLMFullResponseEndFrame` is consumed upstream by the assistant aggregator).
 
 4. **Pipecat 1.0 API quirks that silently bite**:
    - Use `LLMContext` + `LLMContextAggregatorPair` from `pipecat.processors.aggregators.llm_response_universal`. The older `OpenAILLMContext` module is gone.
@@ -51,11 +82,15 @@ Single entrypoint `bot.py`. Everything wires up inside `main()`:
 
 5. **Piper is in-process.** `PiperTTSService` loads the voice via `PiperVoice.load()` — there is no separate `piper.http_server` process. `download_dir` must point at a directory containing `<voice>.onnx` + `.onnx.json`; auto-downloads if missing. `use_cuda=False` is intentional (we don't install `onnxruntime-gpu`; CPU is fast enough for Piper).
 
+6. **Wiki auto-seeds on first run.** `ensure_wiki_seeded()` copies `wiki_templates/` (tracked) → `wiki/` (gitignored). Edit pages freely; never commit `wiki/`. Override location with `WIKI_DIR=/path/to/wiki`.
+
+7. **Identity lives at the transport layer, not in the LLM.** Every session carries `device_id` / `user_id` / `persona_id`; the LLM never decides who it's talking to. For multi-toy (Phase 9), each WebSocket connection will carry those fields in query params.
+
 ## Memory and plan
 
 Cross-session context lives outside the repo:
 - `~/.claude/projects/-home-maikel-coding-PipecatAssistant/memory/` — auto-loaded per project, has gotchas + v1 status
-- `~/.claude/plans/sequential-swimming-lake.md` — phase-based tracker with `[x]/[ ]/[~]` markers. v1 is green as of 2026-04-17. Next-session backlog is Phase 5.2 (polish) and Phase 6 (tool-calling, persistent context, wake-word, web UI).
+- `~/.claude/plans/jolly-nibbling-octopus.md` — Phase 8 MVP plan (runner + text transport + wiki retrieval + librarian). Completed 2026-04-19.
 
 Before implementation work, read the plan and confirm alignment with the user — he prefers plan-first, then step-by-step execution.
 
