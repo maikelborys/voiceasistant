@@ -33,6 +33,7 @@ from pipecat.turns.user_mute import AlwaysUserMuteStrategy
 from voiceassistant import config
 from voiceassistant.personas import Persona
 from voiceassistant.processors.speech_logger import SpeechEventLogger
+from voiceassistant.processors.wiki_retrieval import WikiRetrieval
 from voiceassistant.session import SessionContext
 from voiceassistant.transports import TransportBundle
 
@@ -64,6 +65,14 @@ def build_pipeline(
         user_params=LLMUserAggregatorParams(**user_params_kwargs),
     )
     stages.append(aggregators.user())
+    stages.append(
+        WikiRetrieval(
+            session=session,
+            context=context,
+            base_system_prompt=persona.system_prompt,
+            budget_chars=config.WIKI_INJECT_BUDGET_CHARS,
+        )
+    )
 
     llm = OLLamaLLMService(
         settings=OLLamaLLMService.Settings(

@@ -26,5 +26,8 @@ PIPER_VOICE_DEFAULT = os.environ.get("PIPER_VOICE_DEFAULT", "en_US-lessac-medium
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = PROJECT_ROOT / "models" / "piper"
 
+# --- Wiki retrieval ---
+WIKI_INJECT_BUDGET_CHARS = int(os.environ.get("WIKI_INJECT_BUDGET_CHARS", "4000"))
+
 # --- Logging ---
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "DEBUG")
