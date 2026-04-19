@@ -51,11 +51,17 @@ systemctl status ollama     # should show "active (running)"
 curl http://localhost:11434 # should return "Ollama is running"
 ```
 
-Pull the model we use:
+Pull the model we use, then build the local tag with a larger context window:
 
 ```bash
 ollama pull llama3.1:8b
+ollama create llama3.1:8b-ctx4k -f ops/ollama/llama3.1-ctx4k.Modelfile
 ```
+
+Stock `llama3.1:8b` runs with `num_ctx=2048` at the Ollama layer, which
+silently truncates older turns mid-conversation. The `-ctx4k` tag bumps
+that to 4096 — largest KV cache we can afford on 8 GB VRAM alongside
+Whisper + nomic-embed. `voiceassistant/config.py` defaults to this tag.
 
 ## 5. Project bootstrap
 

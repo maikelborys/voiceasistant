@@ -11,7 +11,11 @@ from pathlib import Path
 
 # --- LLM ---
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+# Custom tag built from models/ollama/llama3.1-ctx4k.Modelfile.
+# Stock llama3.1:8b defaults to num_ctx=2048, which truncated older turns and
+# caused mid-story forgetting. 4k is the largest KV cache we can afford on
+# an 8 GB card alongside Whisper turbo + nomic-embed without OOM risk.
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-ctx4k")
 OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0.7"))
 
 # --- Embeddings (nomic-embed-text via Ollama) ---
