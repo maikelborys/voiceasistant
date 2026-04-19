@@ -60,7 +60,7 @@ def build_pipeline(
             WhisperSTTService(
                 settings=WhisperSTTService.Settings(**stt_settings_kwargs),
                 device=config.WHISPER_DEVICE,
-                compute_type=config.WHISPER_COMPUTE_TYPE,
+                compute_type=persona.whisper_compute_type or config.WHISPER_COMPUTE_TYPE,
             )
         )
 
