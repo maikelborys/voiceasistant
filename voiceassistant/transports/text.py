@@ -14,11 +14,12 @@ are observed but not rendered (SpeechEventLogger still logs them).
 
 from __future__ import annotations
 
+import asyncio
 import sys
 
 from loguru import logger
 from pipecat.frames.frames import (
-    EndFrame,
+    EndTaskFrame,
     Frame,
     LLMFullResponseEndFrame,
     LLMTextFrame,
@@ -53,29 +54,48 @@ class StdinTextInput(FrameProcessor):
         await self.push_frame(frame, direction)
 
     async def _read_stdin(self) -> None:
+        """Read stdin via asyncio.StreamReader so cancellation actually works.
+
+        `run_in_executor(sys.stdin.readline)` is not cancellable — the executor
+        thread stays blocked on read(), which Pipecat then flags as a dangling
+        task on shutdown and leaves Ctrl+C stuck. connect_read_pipe gives us a
+        real asyncio read that wakes on task cancel.
+        """
         loop = self.get_event_loop()
-        while True:
-            line = await loop.run_in_executor(None, sys.stdin.readline)
-            if line == "":
-                logger.info("stdin EOF — shutting down pipeline")
-                await self.push_frame(EndFrame(), FrameDirection.DOWNSTREAM)
-                return
-            text = line.rstrip("\n").strip()
-            if not text:
-                sys.stdout.write(_PROMPT)
-                sys.stdout.flush()
-                continue
-            await self.push_frame(UserStartedSpeakingFrame(), FrameDirection.DOWNSTREAM)
-            await self.push_frame(
-                TranscriptionFrame(
-                    text=text,
-                    user_id=self._session.user_id,
-                    timestamp=time_now_iso8601(),
-                    finalized=True,
-                ),
-                FrameDirection.DOWNSTREAM,
-            )
-            await self.push_frame(UserStoppedSpeakingFrame(), FrameDirection.DOWNSTREAM)
+        reader = asyncio.StreamReader()
+        await loop.connect_read_pipe(
+            lambda: asyncio.StreamReaderProtocol(reader), sys.stdin
+        )
+        try:
+            while True:
+                line_bytes = await reader.readline()
+                if not line_bytes:
+                    logger.info("stdin EOF — shutting down pipeline")
+                    await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+                    return
+                text = line_bytes.decode("utf-8", errors="replace").rstrip("\n").strip()
+                if not text:
+                    sys.stdout.write(_PROMPT)
+                    sys.stdout.flush()
+                    continue
+                await self.push_frame(
+                    UserStartedSpeakingFrame(), FrameDirection.DOWNSTREAM
+                )
+                await self.push_frame(
+                    TranscriptionFrame(
+                        text=text,
+                        user_id=self._session.user_id,
+                        timestamp=time_now_iso8601(),
+                        finalized=True,
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
+                await self.push_frame(
+                    UserStoppedSpeakingFrame(), FrameDirection.DOWNSTREAM
+                )
+        except asyncio.CancelledError:
+            logger.debug("stdin reader cancelled — clean exit")
+            raise
 
 
 class StdoutTextOutput(FrameProcessor):
